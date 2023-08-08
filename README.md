@@ -4,7 +4,7 @@ Side-by-side comparison of the RoPE and xPos positional embedding algorithms
 used in LLMs.
 
 This repository contains a self-contained Python implementation of each
-positional embeddings.  The xPos embedding was invented as an enhancement
+positional embedding.  The xPos embedding was invented as an enhancement
 to RoPE, addressing problems with extrapolation and undesirable cyclical
 oscillations of attention scores in the latter with increasing token distance.
 
