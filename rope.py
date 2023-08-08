@@ -1,17 +1,23 @@
-# https://arxiv.org/pdf/2104.09864.pdf
-# https://huggingface.co/tiiuae/falcon-7b/blob/main/modelling_RW.py#L39
-
+# https://arxiv.org/pdf/2212.10554.pdf
+# https://github.com/syncdoth/RetNet/blob/main/retnet/xpos_relative_position.py
 from einops import rearrange
 
-# rotary pos emb helpers (torch.jit.script does not seem to support staticmethod...)
-# 0,1,2,3,4,5,6,7 -> -4,-5,-6,-7,0,1,2,3
-def rotate_half(x):
-    x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
-    return torch.cat((-x2, x1), dim=x1.ndim - 1)  # dim=-1 triggers a bug in torch < 1.8.0
+# [1,2]    [1,1,2,2]
+# [3,4] -> [3,3,4,4]
+# [5,6]    [5,5,6,6]
+def duplicate_interleave(m):
+    return m.view(-1, 1).repeat(1, 2).view(m.shape[0], -1)
+
+# 0,1,2,3,4,5,6,7 -> -1,0,-3,2,-5,4,-7,6
+def rotate_every_two(x):
+    x1 = x[:, :, ::2]
+    x2 = x[:, :, 1::2]
+    x = torch.stack((-x2, x1), dim=-1)
+    return x.flatten(-2)  # in einsum notation: rearrange(x, '... d j -> ... (d j)')\
 
 
-class RotaryEmbedding(torch.nn.Module):
-    """Implementation of RotaryEmbedding from GPT-NeoX.
+class OrigRotaryEmbedding(torch.nn.Module):
+    """Implementation of RotaryEmbedding as described in the original RoFormer paper.
     This implementation is designed to operate on queries and keys that are compatible with
     [batch_size, n_heads_per_partition, seq_len, head_dim] (e.g. MinGPTAttention format).
     """
@@ -19,7 +25,7 @@ class RotaryEmbedding(torch.nn.Module):
     def __init__(
         self,
         head_dim: int,
-        base=10000,
+        base=10000
     ):
         super().__init__()
         inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2).float() / head_dim))
@@ -40,7 +46,7 @@ class RotaryEmbedding(torch.nn.Module):
             self.seq_len_cached = seq_len
             t = torch.arange(seq_len, device=device).type_as(self.inv_freq)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-            emb = torch.cat((freqs, freqs), dim=-1).to(device)
+            emb = duplicate_interleave(freqs).to(device)
 
             if dtype in [torch.float16, torch.bfloat16]:
                 emb = emb.float()
@@ -58,5 +64,4 @@ class RotaryEmbedding(torch.nn.Module):
         cos, sin = self.cos_sin(seq_len, q.device, q.dtype)
 
 
-        return (q * cos) + (rotate_half(q) * sin),
-               (k * cos) + (rotate_half(k) * sin)
+        return (q * cos) + (rotate_every_two(q) * sin), (k * cos) + (rotate_every_two(k) * sin)
