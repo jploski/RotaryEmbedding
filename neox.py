@@ -1,3 +1,5 @@
+import torch
+
 # https://arxiv.org/pdf/2104.09864.pdf
 # https://huggingface.co/tiiuae/falcon-7b/blob/main/modelling_RW.py#L39
 

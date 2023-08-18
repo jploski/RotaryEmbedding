@@ -1,3 +1,5 @@
+import torch
+
 # https://arxiv.org/pdf/2212.10554.pdf
 # https://github.com/syncdoth/RetNet/blob/main/retnet/xpos_relative_position.py
 from einops import rearrange
