@@ -69,5 +69,5 @@ class XPosEmbedding(torch.nn.Module):
         batch, seq_len, head_dim = q.shape
         cos, sin = self.cos_sin(seq_len, q.device, q.dtype)
         scale = self.scale**torch.arange(seq_len).to(self.scale).div(self.scale_base)[:, None]
-        scale = duplicate_interleave(scale)
+        scale = duplicate_interleave(scale).to(q.device)
         return (q * cos * scale) + (rotate_every_two(q) * sin * scale), (k * cos * (1 / scale)) + (rotate_every_two(k) * sin * (1 / scale))
